@@ -4,18 +4,36 @@ import time
 import xlsxwriter
 
 
-ser = serial.Serial('COM3')
+#ser = serial.Serial('COM3')
+ser = serial.Serial(
+port = "COM3",
+baudrate = 9600,
+bytesize = serial.EIGHTBITS, 
+parity = serial.PARITY_NONE,
+stopbits = serial.STOPBITS_ONE, 
+timeout = 1,
+xonxoff = False,
+rtscts = True,
+dsrdtr = True,
+writeTimeout = 2
+)
 
-#print("connected to: " + ser.portstr)
+
+print("connected to: " + ser.portstr)
+#ser.open()
+print(ser.isOpen())
+#ser.close()
+print(ser.isOpen())
+#print(ser.read())
 
 # this will store the line
 seq = []
 count = 1
 
 # Создание новой excel книги. В качестве имени книги используется дата и время создания
-wbName = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S") + '.xlsx'
+wbName = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + '.xlsx'
 wb = xlsxwriter.Workbook(wbName)
-ws = workbook.add_worksheet()
+ws = wb.add_worksheet()
 
 # Выставляем курсор в первую ячейку (A1)
 row = 0
@@ -33,6 +51,7 @@ while True:
             seq = []
             count += 1
             break
-
-
-ser.close()
+        
+        if ser.isOpen == False:
+            wb.close()
+            break
