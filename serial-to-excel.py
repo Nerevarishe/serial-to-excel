@@ -20,11 +20,6 @@ writeTimeout = 2
 
 
 print("connected to: " + ser.portstr)
-#ser.open()
-print(ser.isOpen())
-#ser.close()
-print(ser.isOpen())
-#print(ser.read())
 
 # this will store the line
 seq = []
@@ -44,10 +39,17 @@ while True:
     for c in ser.read():
         seq.append(chr(c)) #convert from ASCII
         joined_seq = ''.join(str(v) for v in seq) #Make a string from array
-
-        if chr(c) == '\n':
-            ws.write(row, col, joined_seq)
+        
+        # Если в серийном порту получен сигнал 'NEW_MEASUREMENT\r\n', перейти на следующую строку в экселе и обнулить переменную seq
+        if joined_seq == 'NEW_MEASUREMENT\r\n':
+            print('New Measurment')
             row += 1
+            seq = []
+            break
+            
+        elif chr(c) == '\n':
+            ws.write(row, col, joined_seq)
+            print(joined_seq)
             seq = []
             count += 1
             break
