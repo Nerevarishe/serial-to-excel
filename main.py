@@ -47,6 +47,10 @@ class SerialToExcel(QtWidgets.QMainWindow, gui.Ui_MainWindow):
         self.setupUi(self)
         # Создание пула потоков
         self.threadpool = QThreadPool()
+        
+        """# Создание объекта серийного порта
+        self.ser = seial.Serial()"""
+        
         # Активация кнопки Connect
         self.disconnect.setEnabled(False)
         # Надпись в статус баре
@@ -70,12 +74,14 @@ class SerialToExcel(QtWidgets.QMainWindow, gui.Ui_MainWindow):
     # Отключение от серийного порта после нажатия кнопки disconnect
     def disconnectFromSerial(self):
         print('Disconnect button pressed!')
+        self.ser.close()
         self.connect.setEnabled(True)
         self.disconnect.setEnabled(False)
         self.statusBar.showMessage('Disconnected')
         
     # Отображение диалогового окна при ошибке:
     def onConnectionError(self, error):
+        self.ser.close()
         error_text = ''.join(map(str, error))
         error_dialog = QMessageBox()
         error_dialog.setText(error_text)
@@ -85,7 +91,7 @@ class SerialToExcel(QtWidgets.QMainWindow, gui.Ui_MainWindow):
 
     # Основная функция программы выполняющая все измерения 
     def workInThread(self):
-        ser = serial.Serial(
+        self.ser = serial.Serial(
                 port = self.serialPort.text(),
                 baudrate = self.baudRate.text(),
                 timeout = 1,
@@ -94,48 +100,55 @@ class SerialToExcel(QtWidgets.QMainWindow, gui.Ui_MainWindow):
                 dsrdtr = self.dsrdtr.isChecked(),
                 writeTimeout = 2
             )
+        """self.ser.port = self.serialPort.text()
+        self.ser.baudrate = self.baudRate.text()
+        self.ser.timeout = 1
+        self.ser.xonxoff = self.xonxoff.isChecked()
+        self.ser.rtscts = self.rtscts.isChecked()
+        self.ser.dsrdtr = self.dsrdtr.isChecked()
+        self.ser.writeTimeout = 2"""
         # КОСТЫЛЬ. Настройка комбо боксов. Разобраться потом 
         # как правильно отправлять данные.
         # stopBits
         if self.stopBits.currentText() == "serial.stopBits_ONE":
-            ser.stopBits = 1
+            self.ser.stopBits = 1
 
         elif self.stopBits.currentText() == "serial.stopBits_ONE_POINT_FIVE":
-            ser.stopBits = 1.5
+            self.ser.stopBits = 1.5
             
         elif self.stopBits.currentText() == "serial.stopBits_TWO":
-            ser.stopBits = 2
+            self.ser.stopBits = 2
 
         # byteSize
         if self.byteSize.currentText() == "serial.EIGHTBITS":
-            ser.bytesize = 8
+            self.ser.bytesize = 8
 
         elif self.byteSize.currentText() == "serial.SEVENBITS":
-            ser.bytesize = 7
+            self.ser.bytesize = 7
 
         elif self.byteSize.currentText() == "serial.SIXBITS":
-            ser.bytesize = 6
+            self.ser.bytesize = 6
 
         elif  self.byteSize.currentText() == "serial.FIVEBITS":
-            ser.bytesize = 5
+            self.ser.bytesize = 5
 
         # parity
         if self.parity.currentText() == "serial.PARITY_NONE":
-            ser.parity = 'N'
+            self.ser.parity = 'N'
 
         elif self.parity.currentText() == "serial.PARITY_EVEN":
-            ser.parity = 'E'
+            self.ser.parity = 'E'
 
         elif self.parity.currentText() == "serial.PARITY_ODD":
-            ser.parity = 'O'
+            self.ser.parity = 'O'
 
         elif  self.parity.currentText() == "serial.PARITY_MARK":
-            ser.parity = 'M'
+            self.ser.parity = 'M'
 
         elif  self.parity.currentText() == "serial.PARITY_SPACE":
-            ser.parity = 'S'
+            self.ser.parity = 'S'
 
-        if ser.isOpen() == True:
+        if self.ser.isOpen() == True:
             self.statusBar.showMessage('Connected to: ' + self.serialPort.text())
 
         else:
@@ -156,28 +169,38 @@ class SerialToExcel(QtWidgets.QMainWindow, gui.Ui_MainWindow):
         row = 1
         col = 1
 
-        while True:
-            for c in ser.read():
-                #convert from ASCII
-                seq.append(chr(c))
-                joined_seq = ''.join(str(v) for v in seq) #Make a string from array
-
+        iterration = 0
+        joined_seq = ''
+        c = 0
+        
+        while self.ser.isOpen() == True:
+            iterration += 1
+            print('while loop iterration ' + str(iterration))
+            try:
+                if self.ser.isOpen() == True:
+                    for c in self.ser.read():
+                        #convert from ASCII
+                        seq.append(chr(c))
+                        joined_seq = ''.join(str(v) for v in seq) #Make a string from array
+            
+            except Exception:
+                #pass
+                traceback.print_exc()
+            
+            else:
                 # Если в серийном порту получен сигнал 'NEW_MEASUREMENT\r\n', перейти на следующую строку в экселе и обнулить переменную seq
-                if joined_seq == 'NEW_MEASUREMENT\r\n':
+                if joined_seq == 'NEW_MEASUREMENT':
                     row += 1
                     seq = []
-                    break
 
                 elif chr(c) == '\n':
                     ws.cell(column = col, row = row, value = joined_seq)
+                    print(joined_seq)
                     seq = []
+                    c = 0
                     #count += 1
                     wb.save(wbName)
-                    break
-
-                if ser.isOpen == False:
-                    wb.save(wbName)
-                    break
+        wb.save(wbName)
 
 
 def main():
