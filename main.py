@@ -13,7 +13,6 @@ import gui
 
 
 class WorkerSignals(QObject):
-    disconnect = pyqtSignal()
     error = pyqtSignal(tuple)
 
 
@@ -27,12 +26,16 @@ class Worker(QRunnable):
     
     @pyqtSlot()
     def run(self):
-        #try:
-        self.fn(*self.args, **self.kwargs)
-        #except:
-        #    traceback.print_exc()
-        #    exctype, value = sys.exc_info()[:2]
-        #    self.signals.error.emit((exctype, value, traceback.format_exc()))
+        try:
+            self.fn(*self.args, **self.kwargs)
+        except:
+            traceback.print_exc()
+            exctype, value = sys.exc_info()[:2]
+            self.signals.error.emit((exctype, value, traceback.format_exc()))
+        else:
+            pass
+        finally:
+            pass
 
 
 class SerialToExcel(QtWidgets.QMainWindow, gui.Ui_MainWindow):
@@ -44,31 +47,42 @@ class SerialToExcel(QtWidgets.QMainWindow, gui.Ui_MainWindow):
         self.setupUi(self)
         # Создание пула потоков
         self.threadpool = QThreadPool()
+        # Активация кнопки Connect
+        self.disconnect.setEnabled(False)
         # Надпись в статус баре
         self.statusBar.showMessage('Disconnected')
         # Запуск чтения серийного порта при нажатии на кнопку Connect
         self.connect.clicked.connect(self.connectToSerial)
-        # Остановка чтения и закрытие серийного порта. Создание файла эксель
-        #self.disconnect.setEnabled(False)
-        #self.disconnect.clicked.connect(self.disconnectFromSerial)
+        # Остановка чтения и закрытие серийного порта, сохранение файла эксель.
+        self.disconnect.clicked.connect(self.disconnectFromSerial)
 
     # Подключение к серийному порту после нажатия кнопки connect
     def connectToSerial(self):
+        # Активация кнопки Disconnect и деактивация Connect
+        self.disconnect.setEnabled(True)
         self.connect.setEnabled(False)
-        #self.disconnect.setEnabled(True)
         print('Connect button pressed!')
         # Запуск измерения в отдельном потоке
         worker = Worker(self.workInThread)
+        worker.signals.error.connect(self.onConnectionError)
         self.threadpool.start(worker)
     
     # Отключение от серийного порта после нажатия кнопки disconnect
-    #def disconnectFromSerial(self):
-    #    print('Disconnect button pressed!')
-    #    self.disconnect.setEnabled(False)
-    #    self.connect.setEnabled(True)
-    #    
-    #   self.statusBar.showMessage('Disconnected')
+    def disconnectFromSerial(self):
+        print('Disconnect button pressed!')
+        self.connect.setEnabled(True)
+        self.disconnect.setEnabled(False)
+        self.statusBar.showMessage('Disconnected')
         
+    # Отображение диалогового окна при ошибке:
+    def onConnectionError(self, error):
+        error_text = ''.join(map(str, error))
+        error_dialog = QMessageBox()
+        error_dialog.setText(error_text)
+        error_dialog.exec()
+        self.connect.setEnabled(True)
+        self.disconnect.setEnabled(False)
+
     # Основная функция программы выполняющая все измерения 
     def workInThread(self):
         ser = serial.Serial(
